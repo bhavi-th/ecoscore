@@ -24,6 +24,7 @@ app.add_middleware(
 # OpenRouter API configuration
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_SEARCH_API_KEY = os.getenv("OPENROUTER_SEARCH_API_KEY")
+OPENROUTER_BUSINESS_API_KEY = os.getenv("OPENROUTER_BUSINESS_API_KEY")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 # Data models
@@ -43,6 +44,18 @@ class AlternativesRequest(BaseModel):
 
 class EcoScoreRequest(BaseModel):
     products: List[Product]
+
+# Business models
+class BusinessInput(BaseModel):
+    category: str
+    material: str
+    transport: str
+    packaging: str
+    units_per_year: Optional[int] = 1000
+
+class SimulationRequest(BaseModel):
+    current: BusinessInput
+    proposed: BusinessInput
 
 class EcoScoreResponse(BaseModel):
     products: List[Product]
@@ -159,13 +172,183 @@ def calculate_eco_score(product_name: str, category: str = "general") -> dict:
         }
     }
 
-async def call_openrouter(prompt: str, use_search_key: bool = False) -> str:
+# Business-specific functions
+def calculate_business_eco_score(business_input: BusinessInput) -> dict:
+    """Calculate eco score for business inputs"""
+    
+    # Material impact scoring
+    material_scores = {
+        "plastic": {"score": 20, "carbon": 15.0},
+        "recycled_plastic": {"score": 45, "carbon": 8.0},
+        "bioplastic": {"score": 55, "carbon": 6.0},
+        "glass": {"score": 60, "carbon": 10.0},
+        "recycled_glass": {"score": 75, "carbon": 5.0},
+        "aluminum": {"score": 40, "carbon": 12.0},
+        "recycled_aluminum": {"score": 70, "carbon": 4.0},
+        "steel": {"score": 35, "carbon": 18.0},
+        "recycled_steel": {"score": 65, "carbon": 7.0},
+        "paper": {"score": 70, "carbon": 3.0},
+        "recycled_paper": {"score": 85, "carbon": 1.5},
+        "cardboard": {"score": 75, "carbon": 2.5},
+        "bamboo": {"score": 90, "carbon": 1.0},
+        "wood": {"score": 65, "carbon": 4.0},
+        "cotton": {"score": 60, "carbon": 8.0},
+        "organic_cotton": {"score": 80, "carbon": 4.0}
+    }
+    
+    # Transport impact scoring
+    transport_scores = {
+        "air": {"score": 15, "carbon": 25.0},
+        "truck_long": {"score": 35, "carbon": 15.0},
+        "truck_local": {"score": 55, "carbon": 8.0},
+        "rail": {"score": 70, "carbon": 5.0},
+        "sea": {"score": 60, "carbon": 6.0},
+        "local": {"score": 85, "carbon": 2.0}
+    }
+    
+    # Packaging impact scoring
+    packaging_scores = {
+        "plastic_wrap": {"score": 25, "carbon": 5.0},
+        "plastic_bottle": {"score": 30, "carbon": 8.0},
+        "plastic_bag": {"score": 20, "carbon": 3.0},
+        "paper_wrap": {"score": 70, "carbon": 1.5},
+        "cardboard": {"score": 75, "carbon": 2.0},
+        "glass_bottle": {"score": 65, "carbon": 4.0},
+        "metal_can": {"score": 60, "carbon": 5.0},
+        "biodegradable": {"score": 85, "carbon": 1.0},
+        "minimal": {"score": 90, "carbon": 0.5},
+        "bulk": {"score": 95, "carbon": 0.2}
+    }
+    
+    # Get scores for each component
+    material_data = material_scores.get(business_input.material.lower(), {"score": 50, "carbon": 10.0})
+    transport_data = transport_scores.get(business_input.transport.lower(), {"score": 50, "carbon": 10.0})
+    packaging_data = packaging_scores.get(business_input.packaging.lower(), {"score": 50, "carbon": 5.0})
+    
+    # Calculate weighted average
+    weights = {"material": 0.5, "transport": 0.3, "packaging": 0.2}
+    total_score = (
+        material_data["score"] * weights["material"] +
+        transport_data["score"] * weights["transport"] +
+        packaging_data["score"] * weights["packaging"]
+    )
+    
+    total_carbon = (
+        material_data["carbon"] * weights["material"] +
+        transport_data["carbon"] * weights["transport"] +
+        packaging_data["carbon"] * weights["packaging"]
+    )
+    
+    # Determine verdict
+    if total_score >= 80:
+        verdict = "SUSTAINABLE"
+    elif total_score >= 60:
+        verdict = "MODERATE"
+    elif total_score >= 40:
+        verdict = "CONCERNING"
+    else:
+        verdict = "UNSUSTAINABLE"
+    
+    return {
+        "score": round(total_score),
+        "carbon": round(total_carbon, 2),
+        "verdict": verdict,
+        "breakdown": {
+            "material": {
+                "score": material_data["score"],
+                "carbon": material_data["carbon"],
+                "contribution": round(material_data["score"] * weights["material"])
+            },
+            "transport": {
+                "score": transport_data["score"],
+                "carbon": transport_data["carbon"],
+                "contribution": round(transport_data["score"] * weights["transport"])
+            },
+            "packaging": {
+                "score": packaging_data["score"],
+                "carbon": packaging_data["carbon"],
+                "contribution": round(packaging_data["score"] * weights["packaging"])
+            }
+        }
+    }
+
+def generate_optimization_suggestions(business_input: BusinessInput) -> list:
+    """Generate optimization suggestions for business"""
+    suggestions = []
+    
+    # Material suggestions
+    if business_input.material.lower() in ["plastic", "steel", "aluminum"]:
+        suggestions.append({
+            "type": "material",
+            "suggestion": f"Switch to recycled_{business_input.material}",
+            "impact": "High",
+            "score_improvement": 25,
+            "carbon_reduction": 40
+        })
+    
+    if business_input.material.lower() == "plastic":
+        suggestions.append({
+            "type": "material",
+            "suggestion": "Switch to bioplastic or bamboo",
+            "impact": "Very High",
+            "score_improvement": 35,
+            "carbon_reduction": 60
+        })
+    
+    # Transport suggestions
+    if business_input.transport.lower() in ["air", "truck_long"]:
+        suggestions.append({
+            "type": "transport",
+            "suggestion": "Switch to rail or sea transport",
+            "impact": "Medium",
+            "score_improvement": 20,
+            "carbon_reduction": 50
+        })
+    
+    if business_input.transport.lower() != "local":
+        suggestions.append({
+            "type": "transport",
+            "suggestion": "Optimize for local sourcing",
+            "impact": "High",
+            "score_improvement": 30,
+            "carbon_reduction": 70
+        })
+    
+    # Packaging suggestions
+    if business_input.packaging.lower().startswith("plastic"):
+        suggestions.append({
+            "type": "packaging",
+            "suggestion": "Switch to paper or cardboard packaging",
+            "impact": "Medium",
+            "score_improvement": 25,
+            "carbon_reduction": 60
+        })
+    
+    if business_input.packaging.lower() not in ["minimal", "bulk", "biodegradable"]:
+        suggestions.append({
+            "type": "packaging",
+            "suggestion": "Use biodegradable or minimal packaging",
+            "impact": "Medium",
+            "score_improvement": 20,
+            "carbon_reduction": 40
+        })
+    
+    return suggestions
+
+async def call_openrouter(prompt: str, use_search_key: bool = False, use_business_key: bool = False) -> str:
     """Call OpenRouter API for AI assistance"""
     # Choose appropriate API key
-    api_key = OPENROUTER_SEARCH_API_KEY if use_search_key else OPENROUTER_API_KEY
+    if use_business_key:
+        api_key = OPENROUTER_BUSINESS_API_KEY
+        key_type = "business"
+    elif use_search_key:
+        api_key = OPENROUTER_SEARCH_API_KEY
+        key_type = "search"
+    else:
+        api_key = OPENROUTER_API_KEY
+        key_type = "alternatives"
     
     if not api_key:
-        key_type = "search" if use_search_key else "alternatives"
         raise HTTPException(status_code=500, detail=f"OpenRouter {key_type} API key not configured")
     
     headers = {
@@ -375,6 +558,132 @@ async def calculate_total_score(request: EcoScoreRequest):
         total_carbon=round(avg_carbon, 2),
         overall_verdict=overall_verdict
     )
+
+# Business API Endpoints
+@app.post("/api/business/analyze")
+async def analyze_business_input(request: BusinessInput):
+    """Analyze business input and calculate eco score"""
+    try:
+        result = calculate_business_eco_score(request)
+        suggestions = generate_optimization_suggestions(request)
+        
+        return {
+            "analysis": result,
+            "suggestions": suggestions,
+            "input": request.dict()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/business/simulate")
+async def simulate_what_if(request: SimulationRequest):
+    """Simulate what-if scenarios"""
+    try:
+        current_analysis = calculate_business_eco_score(request.current)
+        proposed_analysis = calculate_business_eco_score(request.proposed)
+        
+        # Calculate improvements
+        score_improvement = proposed_analysis["score"] - current_analysis["score"]
+        carbon_reduction = current_analysis["carbon"] - proposed_analysis["carbon"]
+        score_improvement_percentage = (score_improvement / current_analysis["score"]) * 100 if current_analysis["score"] > 0 else 0
+        carbon_reduction_percentage = (carbon_reduction / current_analysis["carbon"]) * 100 if current_analysis["carbon"] > 0 else 0
+        
+        # Calculate scale impact
+        units_per_year = request.current.units_per_year or 1000
+        total_carbon_savings = carbon_reduction * units_per_year
+        
+        return {
+            "current": current_analysis,
+            "proposed": proposed_analysis,
+            "improvements": {
+                "score_improvement": score_improvement,
+                "carbon_reduction": carbon_reduction,
+                "score_improvement_percentage": round(score_improvement_percentage, 2),
+                "carbon_reduction_percentage": round(carbon_reduction_percentage, 2),
+                "total_carbon_savings_per_year": round(total_carbon_savings, 2)
+            },
+            "scale_impact": {
+                "units_per_year": units_per_year,
+                "total_carbon_savings": round(total_carbon_savings, 2)
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/business/optimize")
+async def find_optimal_configuration(request: BusinessInput):
+    """Find the optimal configuration"""
+    try:
+        # Define optimal options for each category
+        materials = ["recycled_paper", "bamboo", "recycled_steel", "recycled_aluminum", "recycled_glass"]
+        transports = ["local", "rail", "sea"]
+        packagings = ["bulk", "minimal", "biodegradable"]
+        
+        best_score = 0
+        best_config = None
+        best_analysis = None
+        
+        # Test combinations (simplified for performance)
+        for material in materials[:3]:  # Limit combinations for speed
+            for transport in transports[:2]:
+                for packaging in packagings[:2]:
+                    test_config = BusinessInput(
+                        category=request.category,
+                        material=material,
+                        transport=transport,
+                        packaging=packaging,
+                        units_per_year=request.units_per_year
+                    )
+                    
+                    analysis = calculate_business_eco_score(test_config)
+                    if analysis["score"] > best_score:
+                        best_score = analysis["score"]
+                        best_config = test_config
+                        best_analysis = analysis
+        
+        # Calculate improvement from current
+        current_analysis = calculate_business_eco_score(request)
+        improvement = best_analysis["score"] - current_analysis["score"]
+        improvement_percentage = (improvement / current_analysis["score"]) * 100 if current_analysis["score"] > 0 else 0
+        
+        return {
+            "optimal_configuration": best_config.dict() if best_config else None,
+            "optimal_analysis": best_analysis,
+            "current_analysis": current_analysis,
+            "potential_improvement": {
+                "score_improvement": improvement,
+                "improvement_percentage": round(improvement_percentage, 2)
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/business/investor-report")
+async def generate_investor_report(request: BusinessInput):
+    """Generate investor report"""
+    try:
+        analysis = calculate_business_eco_score(request)
+        suggestions = generate_optimization_suggestions(request)
+        
+        # Find best suggestion
+        best_suggestion = max(suggestions, key=lambda x: x["score_improvement"]) if suggestions else None
+        
+        # Calculate potential improvements
+        potential_score = analysis["score"] + (best_suggestion["score_improvement"] if best_suggestion else 0)
+        improvement_percentage = ((potential_score - analysis["score"]) / analysis["score"]) * 100 if analysis["score"] > 0 else 0
+        
+        return {
+            "current_performance": analysis,
+            "potential_performance": {
+                "score": potential_score,
+                "improvement_percentage": round(improvement_percentage, 2)
+            },
+            "top_recommendation": best_suggestion,
+            "market_position": "Above Average" if analysis["score"] >= 60 else "Needs Improvement",
+            "investment_priority": "High" if analysis["score"] < 50 else "Medium" if analysis["score"] < 70 else "Low"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import InputPanel from "./components/InputPanel";
 import ConsumerInputPanel from "./components/ConsumerInputPanel";
+import BusinessInputPanel from "./components/BusinessInputPanel";
 import Score from "./components/Score";
 import Simulator from "./components/Simulator";
 import AlternativesPanel from "./components/AlternativesPanel";
@@ -21,6 +22,7 @@ function App() {
 
   const [baselineCarbon, setBaselineCarbon] = useState(null);
   const [foundProducts, setFoundProducts] = useState([]);
+  const [businessData, setBusinessData] = useState(null);
   
   // Real-Time Response: Results are computed instantly on every state change
   const results = calculateEcoScore(inputs);
@@ -37,6 +39,7 @@ function App() {
     setMode(newMode);
     setBaselineCarbon(null); // Reset baseline for fresh What-If simulation
     setFoundProducts([]);    // Clear scan history
+    setBusinessData(null);   // Clear business data
     setInputs({
       categoryVal: 0,
       materialVal: 0,
@@ -75,7 +78,10 @@ function App() {
         {/* LEFT PANEL: DATA ACQUISITION */}
         <section className="glass-card">
           {mode === "business" ? (
-            <InputPanel inputs={inputs} setInputs={setInputs} />
+            <BusinessInputPanel 
+              businessData={businessData} 
+              setBusinessData={setBusinessData}
+            />
           ) : (
             <ConsumerInputPanel 
               setInputs={setInputs}
@@ -87,8 +93,9 @@ function App() {
         {/* CENTER PANEL: ANALYSIS HUD */}
         <section className="glass-card main-display">
           <Score 
-            data={results} 
-            productName={inputs.name} 
+            data={businessData?.analysis || results} 
+            foundProducts={foundProducts}
+            productName={businessData?.analysis ? "BUSINESS_ANALYSIS" : inputs.name} 
             mode={mode} 
           />
         </section>
