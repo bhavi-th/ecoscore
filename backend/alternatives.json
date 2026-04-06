@@ -1,0 +1,56 @@
+{
+  "alternatives": [
+    {
+      "name": "Sparkling Water",
+      "reason": "Sparkling water is a carbonated beverage that does not contain any artificial sweeteners or additives, making it a more environmentally-friendly alternative to Diet Coke. The production of sparkling water has a significantly lower carbon footprint compared to the manufacturing of Diet Coke.",
+      "carbon_change": -5.2,
+      "score": 57,
+      "carbon": 14.8,
+      "verdict": "CONCERNING",
+      "factors": {
+        "category": "drinks",
+        "keywords_found": [],
+        "brand_adjustment": false
+      }
+    },
+    {
+      "name": "Unsweetened Iced Tea",
+      "reason": "Unsweetened iced tea is a refreshing and healthy alternative to Diet Coke. It is made from natural ingredients, does not contain any artificial sweeteners, and has a much lower carbon footprint compared to the production of Diet Coke.",
+      "carbon_change": -3.8,
+      "score": 57,
+      "carbon": 16.2,
+      "verdict": "CONCERNING",
+      "factors": {
+        "category": "drinks",
+        "keywords_found": [],
+        "brand_adjustment": false
+      }
+    },
+    {
+      "name": "Kombucha",
+      "reason": "Kombucha is a fermented tea beverage that is rich in probiotics and antioxidants. It is a more sustainable choice than Diet Coke as it is made from natural ingredients and the fermentation process has a lower environmental impact.",
+      "carbon_change": -4.6,
+      "score": 57,
+      "carbon": 15.4,
+      "verdict": "CONCERNING",
+      "factors": {
+        "category": "drinks",
+        "keywords_found": [],
+        "brand_adjustment": false
+      }
+    },
+    {
+      "name": "Infused Water",
+      "reason": "Infused water is a refreshing and healthy alternative to Diet Coke. It is made by infusing water with fresh fruits, herbs, or vegetables, and does not contain any artificial sweeteners or additives. The production of infused water has a significantly lower carbon footprint compared to the manufacturing of Diet Coke.",
+      "carbon_change": -4.2,
+      "score": 57,
+      "carbon": 15.8,
+      "verdict": "CONCERNING",
+      "factors": {
+        "category": "drinks",
+        "keywords_found": [],
+        "brand_adjustment": false
+      }
+    }
+  ]
+}

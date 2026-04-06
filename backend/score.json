@@ -1,0 +1,13 @@
+{
+  "name": "Diet Coke",
+  "category": "drinks",
+  "environmental_notes": "Manually added product - score calculated by algorithm",
+  "score": 57,
+  "carbon": 20.0,
+  "verdict": "CONCERNING",
+  "factors": {
+    "category": "drinks",
+    "keywords_found": [],
+    "brand_adjustment": false
+  }
+}
