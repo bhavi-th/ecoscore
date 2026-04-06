@@ -762,7 +762,8 @@ class BestProductRequest(BaseModel):
 @app.post("/api/best-product-auto")
 async def best_product_auto(request: BestProductRequest):
     """
-    Given a product name, fetch alternatives and return the best product.
+    Given a product name, fetch alternatives and return the best product
+    along with an explanation from the LLM why it's the better choice.
     """
     if not request.product_name:
         raise HTTPException(status_code=400, detail="Product name is required")
@@ -785,7 +786,6 @@ async def best_product_auto(request: BestProductRequest):
         response = await get_alternatives(prompt_request)
         alternatives_data = response.get("alternatives", [])
 
-        # Convert to Product objects
         alternatives = [
             Product(
                 name=alt["name"],
@@ -814,12 +814,27 @@ async def best_product_auto(request: BestProductRequest):
     # Sort by score descending, then carbon ascending
     best_product = sorted(scored_products, key=lambda x: (-x.score, x.carbon))[0]
 
+    # 4. Ask LLM for explanation why this is the best choice
+    explanation_prompt = f"""
+    You are an environmental sustainability expert. 
+    Among the following products: {[p.name for p in scored_products]}, 
+    the one selected as best is '{best_product.name}'. 
+    Provide a concise, clear explanation why it is the better eco-friendly choice compared to the others,
+    focusing on carbon footprint, sustainability of materials, packaging, and transport.
+    """
+
+    try:
+        explanation = await call_openrouter(explanation_prompt)
+    except Exception:
+        explanation = "Explanation could not be generated."
+
     return {
         "best_product": {
             "name": best_product.name,
             "score": best_product.score,
             "carbon": best_product.carbon,
             "verdict": best_product.verdict,
+            "explanation": explanation.strip(),
         },
         "alternatives_considered": [
             p.name for p in scored_products if p.name != best_product.name
